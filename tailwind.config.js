@@ -5,80 +5,82 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
-        ring: "hsl(var(--ring))",
-        background: "hsl(var(--background))",
-        foreground: "hsl(var(--foreground))",
+        // 微课坊 · 低饱和暖色纸感体系
+        paper: "#FAF6F0",
+        "paper-deep": "#F3EDE3",
+        ink: "#2E2A26",
+        "ink-soft": "#6B6259",
+        "ink-faint": "#A79C8F",
+        line: "#E7DFD3",
+        card: "#FFFFFF",
         primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
-        secondary: {
-          DEFAULT: "hsl(var(--secondary))",
-          foreground: "hsl(var(--secondary-foreground))",
-        },
-        destructive: {
-          DEFAULT: "hsl(var(--destructive) / <alpha-value>)",
-          foreground: "hsl(var(--destructive-foreground) / <alpha-value>)",
-        },
-        muted: {
-          DEFAULT: "hsl(var(--muted))",
-          foreground: "hsl(var(--muted-foreground))",
+          DEFAULT: "#C96F4A",
+          deep: "#A95534",
+          soft: "#F5E0D3",
+          foreground: "#FFFFFF",
         },
         accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
+          DEFAULT: "#5F7A61",
+          soft: "#E4EDE4",
+          foreground: "#FFFFFF",
         },
-        popover: {
-          DEFAULT: "hsl(var(--popover))",
-          foreground: "hsl(var(--popover-foreground))",
+        amber: "#D9A441",
+        "indigo-soft": "#7A86A8",
+        error: {
+          DEFAULT: "#B4544A",
+          soft: "#F6E3E0",
         },
-        card: {
-          DEFAULT: "hsl(var(--card))",
-          foreground: "hsl(var(--card-foreground))",
-        },
-        sidebar: {
-          DEFAULT: "hsl(var(--sidebar-background))",
-          foreground: "hsl(var(--sidebar-foreground))",
-          primary: "hsl(var(--sidebar-primary))",
-          "primary-foreground": "hsl(var(--sidebar-primary-foreground))",
-          accent: "hsl(var(--sidebar-accent))",
-          "accent-foreground": "hsl(var(--sidebar-accent-foreground))",
-          border: "hsl(var(--sidebar-border))",
-          ring: "hsl(var(--sidebar-ring))",
+        border: "#E7DFD3",
+        input: "#E7DFD3",
+        ring: "#C96F4A",
+        background: "#FAF6F0",
+        foreground: "#2E2A26",
+        muted: {
+          DEFAULT: "#F3EDE3",
+          foreground: "#6B6259",
         },
       },
-      borderRadius: {
-        xl: "calc(var(--radius) + 4px)",
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
-        xs: "calc(var(--radius) - 6px)",
+      fontFamily: {
+        serif: ['"Noto Serif SC"', 'Songti SC', 'serif'],
+        sans: ['"Noto Sans SC"', 'PingFang SC', 'Microsoft YaHei', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'monospace'],
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+        card: "0 1px 2px rgba(46,42,38,0.04), 0 8px 24px rgba(46,42,38,0.06)",
+        "card-hover": "0 2px 4px rgba(46,42,38,0.06), 0 16px 40px rgba(46,42,38,0.10)",
+        glow: "0 0 0 4px rgba(201,111,74,0.28)",
+      },
+      borderRadius: {
+        xl: "16px",
+        lg: "12px",
+        md: "10px",
+        sm: "8px",
       },
       keyframes: {
-        "accordion-down": {
-          from: { height: "0" },
-          to: { height: "var(--radix-accordion-content-height)" },
+        "breathe-dot": {
+          "0%, 100%": { opacity: "1" },
+          "50%": { opacity: "0.35" },
         },
-        "accordion-up": {
-          from: { height: "var(--radix-accordion-content-height)" },
-          to: { height: "0" },
+        "breathe-glow": {
+          "0%, 100%": { boxShadow: "0 0 0 0 rgba(201,111,74,0.28)" },
+          "50%": { boxShadow: "0 0 0 6px rgba(201,111,74,0.12)" },
         },
-        "caret-blink": {
-          "0%,70%,100%": { opacity: "1" },
-          "20%,50%": { opacity: "0" },
+        "spin-slow": {
+          from: { transform: "rotate(0deg)" },
+          to: { transform: "rotate(360deg)" },
+        },
+        shimmer: {
+          "0%": { transform: "translateX(-100%)" },
+          "100%": { transform: "translateX(100%)" },
         },
       },
       animation: {
-        "accordion-down": "accordion-down 0.2s ease-out",
-        "accordion-up": "accordion-up 0.2s ease-out",
-        "caret-blink": "caret-blink 1.25s ease-out infinite",
+        "breathe-dot": "breathe-dot 1.2s ease-in-out infinite",
+        "breathe-glow": "breathe-glow 2s ease-in-out infinite",
+        "spin-slow": "spin-slow 1.4s linear infinite",
+        shimmer: "shimmer 1.5s ease-in-out infinite",
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [],
 }

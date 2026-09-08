@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- 打开的线框书本 -->
+  <path d="M32 16 C26 11, 16 10, 8 12 L8 48 C16 46, 26 47, 32 52 C38 47, 48 46, 56 48 L56 12 C48 10, 38 11, 32 16 Z"
+        stroke="#5F7A61" stroke-width="2.5" stroke-linejoin="round" fill="#FAF6F0"/>
+  <path d="M32 16 L32 52" stroke="#5F7A61" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M13 20 C18 19, 23 19.5, 27 21.5" stroke="#5F7A61" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <path d="M13 27 C18 26, 23 26.5, 27 28.5" stroke="#5F7A61" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <path d="M37 21.5 C41 19.5, 46 19, 51 20" stroke="#5F7A61" stroke-width="1.5" stroke-linecap="round" opacity="0.55"/>
+  <!-- 播放三角 -->
+  <path d="M28 27.5 L40.5 34.5 L28 41.5 Z" fill="#C96F4A" stroke="#C96F4A" stroke-width="1.5" stroke-linejoin="round"/>
+</svg>
