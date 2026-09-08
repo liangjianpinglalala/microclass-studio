@@ -55,7 +55,8 @@ async function callMoonshot(content: string, audience: string): Promise<LessonSc
     body: JSON.stringify({
       model: env.moonshotModel,
       messages: buildPrompt(content, audience),
-      temperature: 0.7,
+      // kimi-k2.x 推理模型仅允许 temperature=1
+      temperature: 1,
       response_format: { type: "json_object" },
     }),
     signal: AbortSignal.timeout(90_000),
