@@ -39,21 +39,49 @@ export interface PipelineOptions {
 
 /* ---------------- API ---------------- */
 
-async function fetchScript(content: string, audience: string): Promise<LessonScript> {
-  const resp = await fetch("/api/script", {
+async function postScriptJob(
+  content: string,
+  audience: string,
+): Promise<Response> {
+  return fetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, audience }),
+    signal: AbortSignal.timeout(100_000),
   });
+}
 
-  // 异步任务模式（202）：后台生成，轮询取结果——绕开预览网关的长请求超时
+async function fetchScript(content: string, audience: string): Promise<LessonScript> {
+  let resp: Response;
+  try {
+    resp = await postScriptJob(content, audience);
+  } catch {
+    // 网络抖动：2 秒后重试一次
+    await new Promise((r) => setTimeout(r, 2000));
+    resp = await postScriptJob(content, audience);
+  }
+
+  // 异步任务模式（202）：后台生成，轮询取结果
   if (resp.status === 202) {
-    const { jobId } = (await resp.json()) as { jobId: string };
+    let { jobId } = (await resp.json()) as { jobId: string };
     const deadline = Date.now() + 5 * 60 * 1000;
+    let resubmits = 0;
     for (;;) {
       await new Promise((r) => setTimeout(r, 2500));
       const r = await fetch(`/api/script/job/${jobId}`);
-      if (!r.ok && r.status !== 404) continue; // 网关抖动时继续轮询
+      if (r.status === 404) {
+        // 任务丢失（实例重启等）：自动重新提交，最多 2 次
+        if (resubmits >= 2) throw new Error("讲解稿任务丢失，请重新生成");
+        resubmits++;
+        const retry = await postScriptJob(content, audience);
+        if (retry.status === 202) {
+          jobId = ((await retry.json()) as { jobId: string }).jobId;
+          continue;
+        }
+        resp = retry;
+        break;
+      }
+      if (!r.ok) continue; // 网关抖动时继续轮询
       const d = (await r.json()) as {
         status?: string;
         script?: LessonScript;
@@ -76,7 +104,7 @@ async function fetchScript(content: string, audience: string): Promise<LessonScr
     throw new Error(message);
   }
 
-  // 兼容旧的同步返回形态
+  // 同步返回形态（默认路径：高速模型约 10 秒出稿）
   const data = (await resp.json()) as { script?: LessonScript } & LessonScript;
   const script = (data as { script?: LessonScript }).script ?? data;
   return validateScript(script);
