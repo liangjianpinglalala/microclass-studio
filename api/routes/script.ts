@@ -46,9 +46,11 @@ ${content.slice(0, 2000)}
   ];
 }
 
-async function callMoonshotOnce(
+async function callModel(
+  model: string,
   content: string,
   audience: string,
+  timeoutMs: number,
 ): Promise<LessonScript> {
   const resp = await fetch(`${env.moonshotBaseUrl}/v1/chat/completions`, {
     method: "POST",
@@ -57,13 +59,13 @@ async function callMoonshotOnce(
       Authorization: `Bearer ${env.moonshotApiKey}`,
     },
     body: JSON.stringify({
-      model: env.moonshotModel,
+      model,
       messages: buildPrompt(content, audience),
-      // kimi-k2.x 推理模型仅允许 temperature=1
+      // kimi-k2.x / k3 推理模型仅允许 temperature=1
       temperature: 1,
       response_format: { type: "json_object" },
     }),
-    signal: AbortSignal.timeout(120_000),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
@@ -79,22 +81,58 @@ async function callMoonshotOnce(
   return script;
 }
 
-/** 调用大模型，失败自动重试一次 */
-async function callMoonshot(
+/**
+ * 模型链：主模型（默认 kimi-k2.7-code-highspeed，约 10 秒出稿）
+ * → 备用 kimi-k3（约 40 秒）→ 内置模板。保证讲解稿环节永远有结果。
+ */
+async function generateScript(
   content: string,
   audience: string,
 ): Promise<LessonScript> {
-  try {
-    return await callMoonshotOnce(content, audience);
-  } catch (e) {
-    console.warn("[script] Moonshot 首次调用失败，3 秒后重试:", e);
-    await new Promise((r) => setTimeout(r, 3000));
-    return callMoonshotOnce(content, audience);
+  if (!env.moonshotApiKey) {
+    console.warn("[script] 未配置 MOONSHOT_API_KEY，使用模板降级");
+    return fallbackScript(content, audience);
   }
+  const chain: { model: string; timeout: number }[] = [
+    { model: env.moonshotModel, timeout: 45_000 },
+  ];
+  if (env.moonshotModel !== "kimi-k3") {
+    chain.push({ model: "kimi-k3", timeout: 45_000 });
+  }
+  for (const step of chain) {
+    try {
+      return await callModel(step.model, content, audience, step.timeout);
+    } catch (e) {
+      console.error(`[script] 模型 ${step.model} 调用失败:`, e);
+    }
+  }
+  console.error("[script] 所有模型均失败，使用模板降级");
+  return fallbackScript(content, audience);
 }
 
-// ── 异步任务模式：POST 立即返回 jobId，GET 轮询结果 ──
-// 预览环境网关有超时限制（长请求会 524），大模型生成走后台任务绕开该限制。
+function validateInput(body: { content?: string; audience?: string }) {
+  const content = (body.content ?? "").trim();
+  const audience = (body.audience ?? "").trim() || "成人大众";
+  if (content.length < 10) return { error: "知识内容太短，请至少输入 10 个字" as const };
+  if (!AUDIENCES.includes(audience)) return { error: "学习对象不合法" as const };
+  return { content, audience };
+}
+
+// ── 主接口：同步返回（主模型约 10 秒，远低于网关超时） ──
+scriptRoute.post("/api/script", async (c) => {
+  let body: { content?: string; audience?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "请求体必须是 JSON" }, 400);
+  }
+  const input = validateInput(body);
+  if ("error" in input) return c.json({ error: input.error }, 400);
+  const script = await generateScript(input.content, input.audience);
+  return c.json(script);
+});
+
+// ── 异步任务模式（保留兼容：POST /api/script/job 创建，GET 轮询） ──
 type Job = {
   status: "pending" | "done" | "error";
   script?: LessonScript;
@@ -111,52 +149,31 @@ function sweepJobs() {
   }
 }
 
-async function runJob(id: string, content: string, audience: string) {
-  const done = (script: LessonScript) =>
-    jobs.set(id, { status: "done", script, createdAt: Date.now() });
-  try {
-    if (env.moonshotApiKey) {
-      try {
-        done(await callMoonshot(content, audience));
-        return;
-      } catch (e) {
-        console.error("[script] Moonshot 调用失败，使用模板降级:", e);
-      }
-    } else {
-      console.warn("[script] 未配置 MOONSHOT_API_KEY，使用模板降级");
-    }
-    done(fallbackScript(content, audience));
-  } catch (e) {
-    console.error("[script] 任务执行异常:", e);
-    jobs.set(id, {
-      status: "error",
-      error: "讲解稿生成失败，请重新生成",
-      createdAt: Date.now(),
-    });
-  }
-}
-
-scriptRoute.post("/api/script", async (c) => {
+scriptRoute.post("/api/script/job", async (c) => {
   let body: { content?: string; audience?: string };
   try {
     body = await c.req.json();
   } catch {
     return c.json({ error: "请求体必须是 JSON" }, 400);
   }
-  const content = (body.content ?? "").trim();
-  const audience = (body.audience ?? "").trim() || "成人大众";
-  if (content.length < 10) {
-    return c.json({ error: "知识内容太短，请至少输入 10 个字" }, 400);
-  }
-  if (!AUDIENCES.includes(audience)) {
-    return c.json({ error: "学习对象不合法" }, 400);
-  }
-
+  const input = validateInput(body);
+  if ("error" in input) return c.json({ error: input.error }, 400);
   sweepJobs();
   const jobId = randomUUID();
   jobs.set(jobId, { status: "pending", createdAt: Date.now() });
-  // 后台执行，不阻塞响应
-  void runJob(jobId, content, audience);
+  void (async () => {
+    try {
+      const script = await generateScript(input.content, input.audience);
+      jobs.set(jobId, { status: "done", script, createdAt: Date.now() });
+    } catch (e) {
+      console.error("[script] 任务执行异常:", e);
+      jobs.set(jobId, {
+        status: "error",
+        error: "讲解稿生成失败，请重新生成",
+        createdAt: Date.now(),
+      });
+    }
+  })();
   return c.json({ jobId }, 202);
 });
 

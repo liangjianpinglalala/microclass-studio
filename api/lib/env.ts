@@ -11,6 +11,6 @@ export const env = {
   moonshotBaseUrl: (
     process.env.MOONSHOT_BASE_URL ?? "https://api.moonshot.cn"
   ).replace(/\/+$/, ""),
-  moonshotModel: process.env.MOONSHOT_MODEL ?? "kimi-k2.6",
+  moonshotModel: process.env.MOONSHOT_MODEL ?? "kimi-k2.7-code-highspeed",
   isProduction: process.env.NODE_ENV === "production",
 };
