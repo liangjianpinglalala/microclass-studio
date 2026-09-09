@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import {
   Blocks,
   BookOpen,
+  FileUp,
   GraduationCap,
   Loader2,
   Mic,
@@ -10,6 +11,7 @@ import {
   Sparkles,
   Users,
 } from "lucide-react";
+import UploadPanel from "@/components/UploadPanel";
 
 const AUDIENCES = [
   { id: "小学生", icon: Blocks },
@@ -35,7 +37,7 @@ export interface FormSectionProps {
   onVoiceChange: (v: string) => void;
   disabled: boolean;
   fallbackHint: boolean;
-  onGenerate: () => void;
+  onGenerate: (overrideContent?: string) => void;
 }
 
 export default function FormSection(props: FormSectionProps) {
@@ -53,6 +55,8 @@ export default function FormSection(props: FormSectionProps) {
   } = props;
 
   const [typing, setTyping] = useState(false);
+  const [tab, setTab] = useState<"paste" | "upload">("paste");
+  const [uploadConfirming, setUploadConfirming] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -173,47 +177,114 @@ export default function FormSection(props: FormSectionProps) {
         </div>
 
         <div className="space-y-6">
-          {/* 知识内容 */}
-          <div>
-            <div className="mb-2 flex items-end justify-between">
-              <label
-                htmlFor="content"
-                className="text-[13px] font-bold tracking-[0.06em] text-ink"
-              >
-                知识内容
-              </label>
-              <div className="flex items-center gap-3">
-                <span className="text-[13px] text-ink-faint">支持任意学科段落</span>
+          {/* 输入方式 Tab */}
+          <div
+            role="tablist"
+            aria-label="输入方式"
+            className="inline-flex rounded-lg bg-paper-deep p-1"
+          >
+            {(
+              [
+                { id: "paste", label: "粘贴文字", icon: PenLine },
+                { id: "upload", label: "上传文件", icon: FileUp },
+              ] as const
+            ).map(({ id, label, icon: Icon }) => {
+              const active = tab === id;
+              return (
                 <button
+                  key={id}
                   type="button"
-                  onClick={fillExample}
-                  disabled={disabled || typing}
-                  className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[13px] text-primary-deep transition-colors hover:bg-paper-deep disabled:opacity-50"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setTab(id)}
+                  disabled={disabled}
+                  className={`relative flex items-center gap-1.5 rounded-md px-4 py-2 text-[14px] transition-colors duration-150 ${
+                    active ? "text-primary-deep" : "text-ink-soft hover:text-ink"
+                  }`}
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
-                  试试示例
+                  {active && (
+                    <motion.span
+                      layoutId="input-tab-indicator"
+                      transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                      className="absolute inset-0 rounded-md bg-card shadow-card"
+                    />
+                  )}
+                  <Icon className="relative z-10 h-4 w-4" />
+                  <span className="relative z-10 font-medium">{label}</span>
                 </button>
-              </div>
-            </div>
-            <div className="relative">
-              <textarea
-                id="content"
-                value={content}
-                onChange={(e) => onContentChange(e.target.value)}
-                disabled={disabled || typing}
-                placeholder="例如：光合作用是绿色植物利用光能，把二氧化碳和水转化成有机物，并释放氧气的过程……"
-                className="input-focus h-[160px] w-full resize-none rounded-lg border bg-card p-4 text-[15px] leading-[1.75] tracking-[0.01em] text-ink placeholder:text-ink-faint"
-              />
-              <span
-                className={`pointer-events-none absolute bottom-3 right-3 font-mono text-[12px] ${
-                  overLimit ? "text-error" : "text-ink-faint"
-                }`}
-              >
-                {len} / {MAX_LEN} 字
-              </span>
-            </div>
+              );
+            })}
           </div>
 
+          {/* 知识内容（粘贴文字） */}
+          {tab === "paste" && (
+            <div>
+              <div className="mb-2 flex items-end justify-between">
+                <label
+                  htmlFor="content"
+                  className="text-[13px] font-bold tracking-[0.06em] text-ink"
+                >
+                  知识内容
+                </label>
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] text-ink-faint">支持任意学科段落</span>
+                  <button
+                    type="button"
+                    onClick={fillExample}
+                    disabled={disabled || typing}
+                    className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[13px] text-primary-deep transition-colors hover:bg-paper-deep disabled:opacity-50"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    试试示例
+                  </button>
+                </div>
+              </div>
+              <div className="relative">
+                <textarea
+                  id="content"
+                  value={content}
+                  onChange={(e) => onContentChange(e.target.value)}
+                  disabled={disabled || typing}
+                  placeholder="例如：光合作用是绿色植物利用光能，把二氧化碳和水转化成有机物，并释放氧气的过程……"
+                  className="input-focus h-[160px] w-full resize-none rounded-lg border bg-card p-4 text-[15px] leading-[1.75] tracking-[0.01em] text-ink placeholder:text-ink-faint"
+                />
+                <span
+                  className={`pointer-events-none absolute bottom-3 right-3 font-mono text-[12px] ${
+                    overLimit ? "text-error" : "text-ink-faint"
+                  }`}
+                >
+                  {len} / {MAX_LEN} 字
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 上传文件 */}
+          {tab === "upload" && (
+            <div>
+              <div className="mb-2 flex items-end justify-between">
+                <span className="text-[13px] font-bold tracking-[0.06em] text-ink">
+                  课件文件
+                </span>
+                <span className="text-[13px] text-ink-faint">
+                  自动提取 PPTX / PDF 中的文字
+                </span>
+              </div>
+              <UploadPanel
+                disabled={disabled}
+                onViewChange={(v) => setUploadConfirming(v === "confirm")}
+                onSwitchToPaste={() => setTab("paste")}
+                onConfirm={(text) => {
+                  onContentChange(text);
+                  onGenerate(text);
+                }}
+              />
+            </div>
+          )}
+
+          {/* 学习对象与音色（确认内容时收起） */}
+          {!(tab === "upload" && uploadConfirming) && (
+            <>
           {/* 学习对象 */}
           <div>
             <div className="mb-2 flex items-end justify-between">
@@ -307,11 +378,14 @@ export default function FormSection(props: FormSectionProps) {
               </div>
             </div>
           )}
+            </>
+          )}
 
-          {/* 生成按钮 */}
+          {/* 生成按钮（粘贴文字流程） */}
+          {tab === "paste" && (
           <motion.button
             type="button"
-            onClick={onGenerate}
+            onClick={() => onGenerate()}
             disabled={!canGenerate}
             whileTap={canGenerate ? { scale: 0.98 } : undefined}
             className={`flex h-[52px] w-full items-center justify-center gap-2 rounded-lg text-[16px] font-bold text-white transition-all duration-150 ${
@@ -335,6 +409,7 @@ export default function FormSection(props: FormSectionProps) {
               </>
             )}
           </motion.button>
+          )}
 
           {/* fallback 提示条 */}
           {fallbackHint && (

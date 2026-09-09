@@ -53,9 +53,16 @@ export default function Home() {
     toastTimer.current = window.setTimeout(() => setToast(null), 3000);
   }, []);
 
-  const handleGenerate = useCallback(async () => {
-    if (generatingRef.current) return;
-    generatingRef.current = true;
+  const handleGenerate = useCallback(
+    async (overrideContent?: string) => {
+      if (generatingRef.current) return;
+      const finalContent = (
+        typeof overrideContent === "string" ? overrideContent : content
+      ).trim();
+      if (overrideContent !== undefined && typeof overrideContent === "string") {
+        setContent(overrideContent);
+      }
+      generatingRef.current = true;
     setStatus("generating");
     setStages(["active", "pending", "pending", "pending"]);
     setLogs([[], [], [], []]);
@@ -69,7 +76,7 @@ export default function Home() {
 
     try {
       const res = await runPipeline(
-        { content: content.trim(), audience, voiceId: voiceId || undefined },
+        { content: finalContent, audience, voiceId: voiceId || undefined },
         {
           onStage: (i, s) =>
             setStages((prev) => prev.map((v, idx) => (idx === i ? s : v))),
@@ -148,7 +155,7 @@ export default function Home() {
                   progress={progress}
                   finished={status === "done"}
                   error={status === "error" ? errorMsg : null}
-                  onRetry={handleGenerate}
+                  onRetry={() => handleGenerate()}
                 />
               </motion.div>
             )}
