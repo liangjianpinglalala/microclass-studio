@@ -7,6 +7,7 @@ import FormSection from "@/components/FormSection";
 import PipelineSection from "@/components/PipelineSection";
 import ResultSection from "@/components/ResultSection";
 import AuthPage from "@/components/AuthPage";
+import AdminPanel from "@/components/AdminPanel";
 import type { AppStatus } from "@/lib/app-types";
 import { runPipeline, type PipelineResult, type StageStatus } from "@/lib/pipeline";
 import {
@@ -20,6 +21,7 @@ const INITIAL_STAGES: StageStatus[] = ["pending", "pending", "pending", "pending
 
 export default function Home() {
   const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
+  const [adminOpen, setAdminOpen] = useState(false);
   const [status, setStatus] = useState<AppStatus>("idle");
   const [content, setContent] = useState("");
   const [audience, setAudience] = useState("初中生");
@@ -152,6 +154,7 @@ export default function Home() {
     setProgress(0);
     setStatus("idle");
     setAuthUser(null);
+    setAdminOpen(false);
   }, [result]);
 
   const generating = status === "generating";
@@ -182,7 +185,13 @@ export default function Home() {
 
   return (
     <div className="min-h-[100dvh]">
-      <Header status={status} user={authUser} onLogout={handleLogout} />
+      <Header
+        status={status}
+        user={authUser}
+        onLogout={handleLogout}
+        onOpenAdmin={() => setAdminOpen(true)}
+      />
+      <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} />
 
       <main className="mx-auto max-w-[1080px] px-6 pb-8 md:px-4">
         <FormSection

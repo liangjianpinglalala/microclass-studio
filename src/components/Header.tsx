@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut } from "lucide-react";
+import { LogOut, Shield } from "lucide-react";
 import type { AppStatus } from "@/lib/app-types";
 import type { AuthUser } from "@/lib/auth";
 
@@ -23,10 +23,12 @@ export default function Header({
   status,
   user,
   onLogout,
+  onOpenAdmin,
 }: {
   status: AppStatus;
   user?: AuthUser | null;
   onLogout?: () => void;
+  onOpenAdmin?: () => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -60,6 +62,16 @@ export default function Header({
           </div>
         </div>
         <div className="flex items-center gap-3">
+          {user && user.role === "admin" && onOpenAdmin && (
+            <button
+              type="button"
+              onClick={onOpenAdmin}
+              className="flex items-center gap-1 rounded-md border border-primary/30 bg-primary-soft px-2.5 py-1.5 text-[13px] font-medium text-primary-deep transition-colors hover:bg-primary/20"
+            >
+              <Shield className="h-3.5 w-3.5" />
+              会员管理
+            </button>
+          )}
           {user && (
             <>
               <span className="hidden items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-[13px] text-ink-soft sm:flex">

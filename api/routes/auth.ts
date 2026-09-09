@@ -34,7 +34,7 @@ async function createSession(userId: number): Promise<{ token: string; expiresAt
   return { token, expiresAt };
 }
 
-type SessionUser = { id: number; username: string; displayName: string };
+type SessionUser = { id: number; username: string; displayName: string; role: string };
 
 async function getSessionUser(token: string | undefined): Promise<SessionUser | null> {
   if (!token) return null;
@@ -44,6 +44,7 @@ async function getSessionUser(token: string | undefined): Promise<SessionUser | 
       id: users.id,
       username: users.username,
       displayName: users.displayName,
+      role: users.role,
     })
     .from(sessions)
     .innerJoin(users, eq(sessions.userId, users.id))
@@ -75,6 +76,18 @@ export const requireAuth = createMiddleware(async (c, next) => {
     console.error("[auth] 会话校验失败（数据库异常）:", e);
     return c.json({ error: "会员服务暂时不可用，请稍后重试" }, 503);
   }
+});
+
+/** 管理员接口中间件：需登录且 role=admin（在 requireAuth 之后使用） */
+export const requireAdmin = createMiddleware(async (c, next) => {
+  const user = c.get("authUser") as SessionUser | undefined;
+  if (!user) {
+    return c.json({ error: "请先登录后再使用" }, 401);
+  }
+  if (user.role !== "admin") {
+    return c.json({ error: "仅管理员可以查看会员列表" }, 403);
+  }
+  await next();
 });
 
 /* ---------------- 校验 ---------------- */
@@ -126,7 +139,7 @@ authRoute.post("/api/auth/register", async (c) => {
   const userId = Number(result[0].insertId);
   const { token, expiresAt } = await createSession(userId);
   setSessionCookie(c, token, expiresAt);
-  return c.json({ user: { id: userId, username: input.username, displayName } });
+  return c.json({ user: { id: userId, username: input.username, displayName, role: "user" } });
 });
 
 authRoute.post("/api/auth/login", async (c) => {
@@ -151,7 +164,7 @@ authRoute.post("/api/auth/login", async (c) => {
   const { token, expiresAt } = await createSession(user.id);
   setSessionCookie(c, token, expiresAt);
   return c.json({
-    user: { id: user.id, username: user.username, displayName: user.displayName },
+    user: { id: user.id, username: user.username, displayName: user.displayName, role: user.role },
   });
 });
 

@@ -14,6 +14,8 @@ export const users = mysqlTable("users", {
   passwordHash: varchar("password_hash", { length: 128 }).notNull(),
   salt: varchar("salt", { length: 64 }).notNull(),
   displayName: varchar("display_name", { length: 64 }).notNull().default(""),
+  /** user=普通会员，admin=管理员（可查看会员列表） */
+  role: varchar("role", { length: 16 }).notNull().default("user"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

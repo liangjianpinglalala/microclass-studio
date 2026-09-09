@@ -7,6 +7,30 @@ export interface AuthUser {
   id: number;
   username: string;
   displayName: string;
+  /** user=普通会员，admin=管理员 */
+  role?: string;
+}
+
+/** 管理员看到的会员条目 */
+export interface AdminUserItem {
+  id: number;
+  username: string;
+  displayName: string;
+  role: string;
+  createdAt: string;
+}
+
+export interface AdminUsersResponse {
+  total: number;
+  newThisWeek: number;
+  users: AdminUserItem[];
+}
+
+/** 管理员：获取会员列表 */
+export async function fetchAdminUsers(): Promise<AdminUsersResponse> {
+  const resp = await apiFetch("/api/admin/users");
+  if (!resp.ok) throw await parseError(resp, `请求失败（HTTP ${resp.status}）`);
+  return (await resp.json()) as AdminUsersResponse;
 }
 
 export const AUTH_REQUIRED_EVENT = "mc:auth-required";
