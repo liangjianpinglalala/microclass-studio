@@ -13,4 +13,5 @@ export const env = {
   ).replace(/\/+$/, ""),
   moonshotModel: process.env.MOONSHOT_MODEL ?? "kimi-k2.7-code-highspeed",
   isProduction: process.env.NODE_ENV === "production",
+  databaseUrl: process.env.DATABASE_URL ?? "",
 };

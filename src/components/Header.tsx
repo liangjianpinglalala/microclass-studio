@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { LogOut } from "lucide-react";
 import type { AppStatus } from "@/lib/app-types";
+import type { AuthUser } from "@/lib/auth";
 
 const BADGE: Record<
   AppStatus,
@@ -17,7 +19,15 @@ const BADGE: Record<
   error: { dot: "#B4544A", text: "ERROR · 需重试", cls: "text-error bg-error-soft" },
 };
 
-export default function Header({ status }: { status: AppStatus }) {
+export default function Header({
+  status,
+  user,
+  onLogout,
+}: {
+  status: AppStatus;
+  user?: AuthUser | null;
+  onLogout?: () => void;
+}) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -49,9 +59,30 @@ export default function Header({ status }: { status: AppStatus }) {
             </span>
           </div>
         </div>
-        <div
-          className={`flex h-7 items-center gap-2 rounded-full px-3 font-mono text-[12px] ${badge.cls}`}
-        >
+        <div className="flex items-center gap-3">
+          {user && (
+            <>
+              <span className="hidden items-center gap-1.5 rounded-full border border-line bg-card px-3 py-1.5 text-[13px] text-ink-soft sm:flex">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent-soft text-[11px] font-bold text-accent">
+                  {(user.displayName || user.username).slice(0, 1)}
+                </span>
+                {user.displayName || user.username}
+              </span>
+              {onLogout && (
+                <button
+                  type="button"
+                  onClick={onLogout}
+                  className="flex items-center gap-1 rounded-md px-2 py-1.5 text-[13px] text-ink-faint transition-colors hover:bg-paper-deep hover:text-ink"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                  退出
+                </button>
+              )}
+            </>
+          )}
+          <div
+            className={`flex h-7 items-center gap-2 rounded-full px-3 font-mono text-[12px] ${badge.cls}`}
+          >
           <span
             className={`h-1.5 w-1.5 rounded-full ${badge.pulse ? "animate-breathe-dot" : ""}`}
             style={{ backgroundColor: badge.dot }}
@@ -67,6 +98,7 @@ export default function Header({ status }: { status: AppStatus }) {
               {badge.text}
             </motion.span>
           </AnimatePresence>
+        </div>
         </div>
       </div>
     </motion.header>

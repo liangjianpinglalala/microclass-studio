@@ -9,6 +9,7 @@ import {
 } from "./lesson";
 import { renderCaptionFrame, renderSlide, type SlideImage } from "./slides";
 import { assembleVideo, preloadFFmpeg } from "./video";
+import { apiFetch } from "./auth";
 
 export type StageStatus = "pending" | "active" | "done" | "error";
 
@@ -43,7 +44,7 @@ async function postScriptJob(
   content: string,
   audience: string,
 ): Promise<Response> {
-  return fetch("/api/script", {
+  return apiFetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content, audience }),
@@ -68,7 +69,7 @@ async function fetchScript(content: string, audience: string): Promise<LessonScr
     let resubmits = 0;
     for (;;) {
       await new Promise((r) => setTimeout(r, 2500));
-      const r = await fetch(`/api/script/job/${jobId}`);
+      const r = await apiFetch(`/api/script/job/${jobId}`);
       if (r.status === 404) {
         // 任务丢失（实例重启等）：自动重新提交，最多 2 次
         if (resubmits >= 2) throw new Error("讲解稿任务丢失，请重新生成");
@@ -118,7 +119,7 @@ function validateScript(script: LessonScript): LessonScript {
 }
 
 async function fetchTTS(text: string, voiceId?: string): Promise<Blob> {
-  const resp = await fetch("/api/tts", {
+  const resp = await apiFetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, voice_id: voiceId }),

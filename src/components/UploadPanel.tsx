@@ -11,6 +11,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { apiFetch } from "@/lib/auth";
 
 const MAX_SIZE = 30 * 1024 * 1024; // 30MB
 const MAX_LEN = 2000;
@@ -82,7 +83,7 @@ export default function UploadPanel(props: UploadPanelProps) {
     try {
       const fd = new FormData();
       fd.append("file", file);
-      const res = await fetch("/api/extract", { method: "POST", body: fd });
+      const res = await apiFetch("/api/extract", { method: "POST", body: fd });
       const data = (await res.json()) as Partial<ExtractResult> & { error?: string };
       if (!res.ok || data.error) {
         transition({

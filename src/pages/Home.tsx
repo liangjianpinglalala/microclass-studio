@@ -6,12 +6,20 @@ import Footer from "@/components/Footer";
 import FormSection from "@/components/FormSection";
 import PipelineSection from "@/components/PipelineSection";
 import ResultSection from "@/components/ResultSection";
+import AuthPage from "@/components/AuthPage";
 import type { AppStatus } from "@/lib/app-types";
 import { runPipeline, type PipelineResult, type StageStatus } from "@/lib/pipeline";
+import {
+  AUTH_REQUIRED_EVENT,
+  fetchMe,
+  logout,
+  type AuthUser,
+} from "@/lib/auth";
 
 const INITIAL_STAGES: StageStatus[] = ["pending", "pending", "pending", "pending"];
 
 export default function Home() {
+  const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
   const [status, setStatus] = useState<AppStatus>("idle");
   const [content, setContent] = useState("");
   const [audience, setAudience] = useState("初中生");
@@ -30,8 +38,23 @@ export default function Home() {
   const toastTimer = useRef<number | null>(null);
   const generatingRef = useRef(false);
 
-  /* 初始化：健康检查 + 音色列表 */
+  /* 初始化：登录态检查 + 401 跳登录监听 */
   useEffect(() => {
+    let cancelled = false;
+    fetchMe().then((user) => {
+      if (!cancelled) setAuthUser(user);
+    });
+    const onAuthRequired = () => setAuthUser(null);
+    window.addEventListener(AUTH_REQUIRED_EVENT, onAuthRequired);
+    return () => {
+      cancelled = true;
+      window.removeEventListener(AUTH_REQUIRED_EVENT, onAuthRequired);
+    };
+  }, []);
+
+  /* 初始化：健康检查 + 音色列表（登录后加载） */
+  useEffect(() => {
+    if (!authUser) return;
     fetch("/api/health")
       .then((r) => r.json())
       .then((data: { ok?: boolean; llm?: string }) => {
@@ -45,7 +68,7 @@ export default function Home() {
         if (data.default) setVoiceId(data.default);
       })
       .catch(() => undefined);
-  }, []);
+  }, [authUser]);
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -118,12 +141,48 @@ export default function Home() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [result]);
 
+  const handleLogout = useCallback(async () => {
+    if (generatingRef.current) return;
+    await logout();
+    if (result) URL.revokeObjectURL(result.videoUrl);
+    setResult(null);
+    setErrorMsg(null);
+    setStages(INITIAL_STAGES);
+    setLogs([[], [], [], []]);
+    setProgress(0);
+    setStatus("idle");
+    setAuthUser(null);
+  }, [result]);
+
   const generating = status === "generating";
   const showPipeline = status !== "idle";
 
+  /* 登录态加载中 */
+  if (authUser === undefined) {
+    return (
+      <div className="flex min-h-[100dvh] items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex flex-col items-center gap-3"
+        >
+          <img src="/logo.svg" alt="微课坊" className="h-10 w-10" />
+          <span className="font-mono text-[12px] tracking-[0.14em] text-ink-faint">
+            LOADING · 加载中
+          </span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  /* 未登录：先注册/登录会员 */
+  if (authUser === null) {
+    return <AuthPage onSuccess={(user) => setAuthUser(user)} />;
+  }
+
   return (
     <div className="min-h-[100dvh]">
-      <Header status={status} />
+      <Header status={status} user={authUser} onLogout={handleLogout} />
 
       <main className="mx-auto max-w-[1080px] px-6 pb-8 md:px-4">
         <FormSection

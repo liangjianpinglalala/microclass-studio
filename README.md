@@ -7,6 +7,7 @@
 
 ## 功能特性
 
+- **会员注册登录**：用户名 + 密码注册（免费），scrypt 加盐哈希存储密码，httpOnly Cookie 会话（7 天有效）；未登录用户无法使用生成、配音、文件提取等全部核心接口
 - **两种输入方式**：直接粘贴知识文字（≤2000 字），或上传 `.pptx` / `.pdf` 文件自动提取文字
 - **内容确认**：上传文件后先展示提取到的全文（可编辑），用户确认后再生成，提取失败会明确提示原因，绝不编造内容
 - **AI 讲解稿**：Moonshot 大模型生成「问题引入 → 知识解释 → 案例 → 小结」四段式中文讲解稿（未配置 API Key 时自动降级为内置模板）
@@ -21,7 +22,8 @@
 |---|---|
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS 3 + Framer Motion |
 | 后端 | Hono 4（`api/`，与 Vite 同端口 3000） |
-| 讲解稿 | Moonshot API（kimi-k2.6，JSON 模式） |
+| 数据库 | MySQL（Drizzle ORM，`users` + `sessions` 两张表） |
+| 讲解稿 | Moonshot API（默认 kimi-k2.7-code-highspeed，JSON 模式，多模型链兜底） |
 | 语音合成 | agent-gw 网关 `generate_speech` |
 | 文件解析 | JSZip（PPTX）+ pdfjs-dist（PDF，含中文 CID 字体 CMap 支持） |
 | 视频合成 | @ffmpeg/ffmpeg 0.12（wasm，浏览器端） |
@@ -49,8 +51,15 @@ npm start              # NODE_ENV=production node dist/boot.js，端口 3000
 | `AGENT_GW_BASE_URL` | 否 | 默认 `https://agent-gw.kimi.com/coding` |
 | `MOONSHOT_API_KEY` | 否 | Moonshot 开放平台密钥；不配置时讲解稿使用内置模板降级生成 |
 | `MOONSHOT_BASE_URL` | 否 | 默认 `https://api.moonshot.cn` |
-| `MOONSHOT_MODEL` | 否 | 默认 `kimi-k2.6` |
+| `MOONSHOT_MODEL` | 否 | 默认 `kimi-k2.7-code-highspeed` |
+| `DATABASE_URL` | 是（会员功能） | MySQL 连接串，如 `mysql://user:pass@host:4000/db` |
 | `PORT` | 否 | 默认 `3000` |
+
+数据库初始化（首次运行或表结构变更后执行）：
+
+```bash
+npm run db:push    # 按 db/schema.ts 创建 users / sessions 表
+```
 
 ## 部署（Render 等 Node 托管平台）
 
