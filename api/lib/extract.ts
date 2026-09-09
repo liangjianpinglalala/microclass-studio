@@ -3,12 +3,13 @@
  * 原则：提取不到文字就明确报错，绝不编造内容。
  */
 import JSZip from "jszip";
-import { createRequire } from "node:module";
+// 注意：esbuild 生产构建的 banner 已声明过 createRequire，这里必须改名避免重复声明
+import { createRequire as nodeCreateRequire } from "node:module";
 import path from "node:path";
 
 // pdfjs-dist 自带的 CMap 文件目录：解码 Adobe-GB1/GBK 等 CID 字体（中文 PDF 常见）所必需
 function resolveCMapUrl(): string {
-  const req = createRequire(import.meta.url);
+  const req = nodeCreateRequire(import.meta.url);
   const pkgPath = req.resolve("pdfjs-dist/package.json");
   return path.join(path.dirname(pkgPath), "cmaps") + path.sep;
 }
