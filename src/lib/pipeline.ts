@@ -39,12 +39,32 @@ export interface PipelineOptions {
 
 /* ---------------- API ---------------- */
 
-async function postJSON<T>(url: string, body: unknown): Promise<T> {
-  const resp = await fetch(url, {
+async function fetchScript(content: string, audience: string): Promise<LessonScript> {
+  const resp = await fetch("/api/script", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ content, audience }),
   });
+
+  // 异步任务模式（202）：后台生成，轮询取结果——绕开预览网关的长请求超时
+  if (resp.status === 202) {
+    const { jobId } = (await resp.json()) as { jobId: string };
+    const deadline = Date.now() + 5 * 60 * 1000;
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 2500));
+      const r = await fetch(`/api/script/job/${jobId}`);
+      if (!r.ok && r.status !== 404) continue; // 网关抖动时继续轮询
+      const d = (await r.json()) as {
+        status?: string;
+        script?: LessonScript;
+        error?: string;
+      };
+      if (d.status === "done" && d.script) return validateScript(d.script);
+      if (d.status === "error") throw new Error(d.error || "讲解稿生成失败，请重新生成");
+      if (Date.now() > deadline) throw new Error("讲解稿生成超时，请重新生成");
+    }
+  }
+
   if (!resp.ok) {
     let message = `请求失败（HTTP ${resp.status}）`;
     try {
@@ -55,16 +75,14 @@ async function postJSON<T>(url: string, body: unknown): Promise<T> {
     }
     throw new Error(message);
   }
-  return (await resp.json()) as T;
+
+  // 兼容旧的同步返回形态
+  const data = (await resp.json()) as { script?: LessonScript } & LessonScript;
+  const script = (data as { script?: LessonScript }).script ?? data;
+  return validateScript(script);
 }
 
-async function fetchScript(content: string, audience: string): Promise<LessonScript> {
-  const data = await postJSON<{ script?: LessonScript } & LessonScript>(
-    "/api/script",
-    { content, audience },
-  );
-  // 兼容 {script: {...}} 与直接返回稿件两种形态
-  const script = (data as { script?: LessonScript }).script ?? data;
+function validateScript(script: LessonScript): LessonScript {
   if (!script || !Array.isArray(script.sections) || script.sections.length === 0) {
     throw new Error("讲解稿格式不正确");
   }

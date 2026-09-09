@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { randomUUID } from "node:crypto";
 import { env } from "../lib/env";
 import {
   fallbackScript,
@@ -45,7 +46,10 @@ ${content.slice(0, 2000)}
   ];
 }
 
-async function callMoonshot(content: string, audience: string): Promise<LessonScript> {
+async function callMoonshotOnce(
+  content: string,
+  audience: string,
+): Promise<LessonScript> {
   const resp = await fetch(`${env.moonshotBaseUrl}/v1/chat/completions`, {
     method: "POST",
     headers: {
@@ -59,7 +63,7 @@ async function callMoonshot(content: string, audience: string): Promise<LessonSc
       temperature: 1,
       response_format: { type: "json_object" },
     }),
-    signal: AbortSignal.timeout(90_000),
+    signal: AbortSignal.timeout(120_000),
   });
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
@@ -73,6 +77,63 @@ async function callMoonshot(content: string, audience: string): Promise<LessonSc
   const script = normalizeScript(JSON.parse(raw));
   if (!script) throw new Error("Moonshot 返回的 JSON 不符合讲解稿结构");
   return script;
+}
+
+/** 调用大模型，失败自动重试一次 */
+async function callMoonshot(
+  content: string,
+  audience: string,
+): Promise<LessonScript> {
+  try {
+    return await callMoonshotOnce(content, audience);
+  } catch (e) {
+    console.warn("[script] Moonshot 首次调用失败，3 秒后重试:", e);
+    await new Promise((r) => setTimeout(r, 3000));
+    return callMoonshotOnce(content, audience);
+  }
+}
+
+// ── 异步任务模式：POST 立即返回 jobId，GET 轮询结果 ──
+// 预览环境网关有超时限制（长请求会 524），大模型生成走后台任务绕开该限制。
+type Job = {
+  status: "pending" | "done" | "error";
+  script?: LessonScript;
+  error?: string;
+  createdAt: number;
+};
+const jobs = new Map<string, Job>();
+const JOB_TTL = 10 * 60 * 1000;
+
+function sweepJobs() {
+  const now = Date.now();
+  for (const [id, j] of jobs) {
+    if (now - j.createdAt > JOB_TTL) jobs.delete(id);
+  }
+}
+
+async function runJob(id: string, content: string, audience: string) {
+  const done = (script: LessonScript) =>
+    jobs.set(id, { status: "done", script, createdAt: Date.now() });
+  try {
+    if (env.moonshotApiKey) {
+      try {
+        done(await callMoonshot(content, audience));
+        return;
+      } catch (e) {
+        console.error("[script] Moonshot 调用失败，使用模板降级:", e);
+      }
+    } else {
+      console.warn("[script] 未配置 MOONSHOT_API_KEY，使用模板降级");
+    }
+    done(fallbackScript(content, audience));
+  } catch (e) {
+    console.error("[script] 任务执行异常:", e);
+    jobs.set(id, {
+      status: "error",
+      error: "讲解稿生成失败，请重新生成",
+      createdAt: Date.now(),
+    });
+  }
 }
 
 scriptRoute.post("/api/script", async (c) => {
@@ -91,15 +152,24 @@ scriptRoute.post("/api/script", async (c) => {
     return c.json({ error: "学习对象不合法" }, 400);
   }
 
-  if (env.moonshotApiKey) {
-    try {
-      const script = await callMoonshot(content, audience);
-      return c.json(script);
-    } catch (e) {
-      console.error("[script] Moonshot 调用失败，使用模板降级:", e);
-    }
-  } else {
-    console.warn("[script] 未配置 MOONSHOT_API_KEY，使用模板降级");
+  sweepJobs();
+  const jobId = randomUUID();
+  jobs.set(jobId, { status: "pending", createdAt: Date.now() });
+  // 后台执行，不阻塞响应
+  void runJob(jobId, content, audience);
+  return c.json({ jobId }, 202);
+});
+
+scriptRoute.get("/api/script/job/:id", (c) => {
+  const job = jobs.get(c.req.param("id"));
+  if (!job) {
+    return c.json({ error: "任务不存在或已过期，请重新生成" }, 404);
   }
-  return c.json(fallbackScript(content, audience));
+  if (job.status === "done") {
+    return c.json({ status: "done", script: job.script });
+  }
+  if (job.status === "error") {
+    return c.json({ status: "error", error: job.error ?? "讲解稿生成失败" });
+  }
+  return c.json({ status: "pending" });
 });
