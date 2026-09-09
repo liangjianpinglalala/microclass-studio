@@ -1,0 +1,19 @@
+# Render 蓝图：一键配置构建与启动命令，密钥在部署界面手动填入
+services:
+  - type: web
+    name: microclass-studio
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: AGENT_GW_API_KEY
+        sync: false # 语音合成密钥，部署时在界面填写
+      - key: AGENT_GW_BASE_URL
+        value: https://agent-gw.kimi.com/coding
+      - key: MOONSHOT_API_KEY
+        sync: false # Moonshot 密钥，部署时在界面填写
+      - key: MOONSHOT_BASE_URL
+        value: https://api.moonshot.cn
+      - key: MOONSHOT_MODEL
+        value: kimi-k2.6
