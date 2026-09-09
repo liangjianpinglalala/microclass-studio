@@ -4,10 +4,11 @@ import type { HttpBindings } from "@hono/node-server";
 import { env } from "./lib/env";
 import { scriptRoute } from "./routes/script";
 import { ttsRoute } from "./routes/tts";
+import { extractRoute } from "./routes/extract";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
-app.use(bodyLimit({ maxSize: 5 * 1024 * 1024 }));
+app.use(bodyLimit({ maxSize: 35 * 1024 * 1024 }));
 
 app.get("/api/health", (c) =>
   c.json({
@@ -19,6 +20,7 @@ app.get("/api/health", (c) =>
 
 app.route("/", scriptRoute);
 app.route("/", ttsRoute);
+app.route("/", extractRoute);
 
 app.all("/api/*", (c) => c.json({ error: "Not Found" }, 404));
 
