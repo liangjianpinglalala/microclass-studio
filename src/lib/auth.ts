@@ -9,6 +9,8 @@ export interface AuthUser {
   displayName: string;
   /** user=普通会员，admin=管理员 */
   role?: string;
+  /** 是否已配置自己的 Moonshot API 密钥 */
+  hasMoonshotKey?: boolean;
 }
 
 /** 管理员看到的会员条目 */
@@ -17,7 +19,24 @@ export interface AdminUserItem {
   username: string;
   displayName: string;
   role: string;
+  hasMoonshotKey: boolean;
   createdAt: string;
+}
+
+/** 保存我的 Moonshot 密钥（后端会先验证有效性） */
+export async function saveMoonshotKey(apiKey: string): Promise<void> {
+  const resp = await apiFetch("/api/user/key", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ apiKey }),
+  });
+  if (!resp.ok) throw await parseError(resp, `保存失败（HTTP ${resp.status}）`);
+}
+
+/** 删除我的 Moonshot 密钥 */
+export async function deleteMoonshotKey(): Promise<void> {
+  const resp = await apiFetch("/api/user/key", { method: "DELETE" });
+  if (!resp.ok) throw await parseError(resp, `删除失败（HTTP ${resp.status}）`);
 }
 
 export interface AdminUsersResponse {

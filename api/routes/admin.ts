@@ -17,19 +17,25 @@ adminRoute.get("/api/admin/users", async (c) => {
       username: users.username,
       displayName: users.displayName,
       role: users.role,
+      moonshotKeyEnc: users.moonshotKeyEnc,
       createdAt: users.createdAt,
     })
     .from(users)
     .orderBy(desc(users.createdAt));
 
+  const safeList = list.map(({ moonshotKeyEnc, ...u }) => ({
+    ...u,
+    hasMoonshotKey: Boolean(moonshotKeyEnc),
+  }));
+
   // 近 7 天新增会员数
   const weekAgo = new Date(Date.now() - 7 * 24 * 3600 * 1000);
-  const newThisWeek = list.filter((u) => u.createdAt >= weekAgo).length;
+  const newThisWeek = safeList.filter((u) => u.createdAt >= weekAgo).length;
 
   return c.json({
-    total: list.length,
+    total: safeList.length,
     newThisWeek,
-    users: list,
+    users: safeList,
   });
 });
 

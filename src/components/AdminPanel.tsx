@@ -142,6 +142,7 @@ export default function AdminPanel({ open, onClose }: AdminPanelProps) {
                       <th className="py-2 pr-3 font-medium">用户名</th>
                       <th className="py-2 pr-3 font-medium">昵称</th>
                       <th className="py-2 pr-3 font-medium">角色</th>
+                      <th className="py-2 pr-3 font-medium">密钥</th>
                       <th className="py-2 font-medium">注册时间</th>
                     </tr>
                   </thead>
@@ -158,6 +159,13 @@ export default function AdminPanel({ open, onClose }: AdminPanelProps) {
                             </span>
                           ) : (
                             <span className="text-[13px] text-ink-faint">会员</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 pr-3">
+                          {m.hasMoonshotKey ? (
+                            <span className="text-[13px] font-medium text-accent">已配置</span>
+                          ) : (
+                            <span className="text-[13px] text-ink-faint">未配置</span>
                           )}
                         </td>
                         <td className="py-2.5 font-mono text-[12.5px] text-ink-soft">

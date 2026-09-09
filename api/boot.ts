@@ -7,6 +7,7 @@ import { ttsRoute } from "./routes/tts";
 import { extractRoute } from "./routes/extract";
 import { authRoute, requireAuth } from "./routes/auth";
 import { adminRoute } from "./routes/admin";
+import { userkeyRoute } from "./routes/userkey";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -29,6 +30,7 @@ app.use("/api/extract", requireAuth);
 
 app.route("/", authRoute);
 app.route("/", adminRoute);
+app.route("/", userkeyRoute);
 app.route("/", scriptRoute);
 app.route("/", ttsRoute);
 app.route("/", extractRoute);

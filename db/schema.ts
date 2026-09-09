@@ -16,6 +16,8 @@ export const users = mysqlTable("users", {
   displayName: varchar("display_name", { length: 64 }).notNull().default(""),
   /** user=普通会员，admin=管理员（可查看会员列表） */
   role: varchar("role", { length: 16 }).notNull().default("user"),
+  /** 用户自己的 Moonshot API 密钥（AES-256-GCM 加密存储，NULL=未配置） */
+  moonshotKeyEnc: varchar("moonshot_key_enc", { length: 512 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

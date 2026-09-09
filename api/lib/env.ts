@@ -14,4 +14,6 @@ export const env = {
   moonshotModel: process.env.MOONSHOT_MODEL ?? "kimi-k2.7-code-highspeed",
   isProduction: process.env.NODE_ENV === "production",
   databaseUrl: process.env.DATABASE_URL ?? "",
+  /** 用户密钥加解密主密钥（平台下发；本地开发缺失时回退到固定派生源，仅影响加密结果） */
+  appSecret: process.env.APP_SECRET ?? "microclass-local-dev-secret",
 };

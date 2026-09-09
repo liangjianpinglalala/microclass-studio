@@ -139,7 +139,9 @@ authRoute.post("/api/auth/register", async (c) => {
   const userId = Number(result[0].insertId);
   const { token, expiresAt } = await createSession(userId);
   setSessionCookie(c, token, expiresAt);
-  return c.json({ user: { id: userId, username: input.username, displayName, role: "user" } });
+  return c.json({
+    user: { id: userId, username: input.username, displayName, role: "user", hasMoonshotKey: false },
+  });
 });
 
 authRoute.post("/api/auth/login", async (c) => {
@@ -164,7 +166,13 @@ authRoute.post("/api/auth/login", async (c) => {
   const { token, expiresAt } = await createSession(user.id);
   setSessionCookie(c, token, expiresAt);
   return c.json({
-    user: { id: user.id, username: user.username, displayName: user.displayName, role: user.role },
+    user: {
+      id: user.id,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role,
+      hasMoonshotKey: Boolean(user.moonshotKeyEnc),
+    },
   });
 });
 
@@ -180,5 +188,12 @@ authRoute.post("/api/auth/logout", async (c) => {
 authRoute.get("/api/auth/me", async (c) => {
   const user = await getSessionUser(getCookie(c, COOKIE_NAME));
   if (!user) return c.json({ error: "未登录" }, 401);
-  return c.json({ user });
+  const rows = await getDb()
+    .select({ moonshotKeyEnc: users.moonshotKeyEnc })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .limit(1);
+  return c.json({
+    user: { ...user, hasMoonshotKey: Boolean(rows[0]?.moonshotKeyEnc) },
+  });
 });

@@ -8,6 +8,7 @@ import PipelineSection from "@/components/PipelineSection";
 import ResultSection from "@/components/ResultSection";
 import AuthPage from "@/components/AuthPage";
 import AdminPanel from "@/components/AdminPanel";
+import KeySettingsModal from "@/components/KeySettingsModal";
 import type { AppStatus } from "@/lib/app-types";
 import { runPipeline, type PipelineResult, type StageStatus } from "@/lib/pipeline";
 import {
@@ -22,6 +23,7 @@ const INITIAL_STAGES: StageStatus[] = ["pending", "pending", "pending", "pending
 export default function Home() {
   const [authUser, setAuthUser] = useState<AuthUser | null | undefined>(undefined);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [keySettingsOpen, setKeySettingsOpen] = useState(false);
   const [status, setStatus] = useState<AppStatus>("idle");
   const [content, setContent] = useState("");
   const [audience, setAudience] = useState("初中生");
@@ -155,6 +157,7 @@ export default function Home() {
     setStatus("idle");
     setAuthUser(null);
     setAdminOpen(false);
+    setKeySettingsOpen(false);
   }, [result]);
 
   const generating = status === "generating";
@@ -190,8 +193,33 @@ export default function Home() {
         user={authUser}
         onLogout={handleLogout}
         onOpenAdmin={() => setAdminOpen(true)}
+        onOpenKeySettings={() => setKeySettingsOpen(true)}
       />
       <AdminPanel open={adminOpen} onClose={() => setAdminOpen(false)} />
+      <KeySettingsModal
+        open={keySettingsOpen}
+        hasKey={Boolean(authUser.hasMoonshotKey)}
+        onClose={() => setKeySettingsOpen(false)}
+        onChanged={(hasKey) =>
+          setAuthUser((u) => (u ? { ...u, hasMoonshotKey: hasKey } : u))
+        }
+      />
+
+      {/* 普通会员未配置密钥时的引导横幅 */}
+      {authUser.role !== "admin" && !authUser.hasMoonshotKey && (
+        <div className="border-b border-primary/20 bg-primary-soft">
+          <div className="mx-auto flex max-w-[1080px] flex-wrap items-center justify-center gap-x-3 gap-y-1 px-6 py-2.5 text-[13.5px] text-primary-deep md:px-4">
+            <span>生成微课将使用你自己的 Moonshot 密钥（免费申请），请先完成配置</span>
+            <button
+              type="button"
+              onClick={() => setKeySettingsOpen(true)}
+              className="rounded-md bg-primary px-3 py-1 text-[12.5px] font-medium text-white transition-opacity hover:opacity-90"
+            >
+              去配置密钥
+            </button>
+          </div>
+        </div>
+      )}
 
       <main className="mx-auto max-w-[1080px] px-6 pb-8 md:px-4">
         <FormSection

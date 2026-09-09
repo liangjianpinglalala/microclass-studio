@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { LogOut, Shield } from "lucide-react";
+import { KeyRound, LogOut, Shield } from "lucide-react";
 import type { AppStatus } from "@/lib/app-types";
 import type { AuthUser } from "@/lib/auth";
 
@@ -24,11 +24,13 @@ export default function Header({
   user,
   onLogout,
   onOpenAdmin,
+  onOpenKeySettings,
 }: {
   status: AppStatus;
   user?: AuthUser | null;
   onLogout?: () => void;
   onOpenAdmin?: () => void;
+  onOpenKeySettings?: () => void;
 }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
@@ -70,6 +72,22 @@ export default function Header({
             >
               <Shield className="h-3.5 w-3.5" />
               会员管理
+            </button>
+          )}
+          {user && onOpenKeySettings && (
+            <button
+              type="button"
+              onClick={onOpenKeySettings}
+              className="relative flex items-center gap-1 rounded-md px-2 py-1.5 text-[13px] text-ink-faint transition-colors hover:bg-paper-deep hover:text-ink"
+            >
+              <KeyRound className="h-3.5 w-3.5" />
+              密钥设置
+              {user.role !== "admin" && !user.hasMoonshotKey && (
+                <span
+                  className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-primary"
+                  title="还未配置密钥"
+                />
+              )}
             </button>
           )}
           {user && (

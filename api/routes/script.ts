@@ -1,6 +1,7 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { randomUUID } from "node:crypto";
 import { env } from "../lib/env";
+import { resolveMoonshotKey, type MoonshotKeyResolution } from "../lib/user-key";
 import {
   fallbackScript,
   normalizeScript,
@@ -47,6 +48,7 @@ ${content.slice(0, 2000)}
 }
 
 async function callModel(
+  apiKey: string,
   model: string,
   content: string,
   audience: string,
@@ -56,7 +58,7 @@ async function callModel(
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${env.moonshotApiKey}`,
+      Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
       model,
@@ -83,14 +85,17 @@ async function callModel(
 
 /**
  * 模型链：主模型（默认 kimi-k2.7-code-highspeed，约 10 秒出稿）
- * → 备用 kimi-k3（约 40 秒）→ 内置模板。保证讲解稿环节永远有结果。
+ * → 备用 kimi-k3（约 40 秒）。
+ * 站点密钥（管理员）失败时降级为内置模板；用户自己的密钥失败则抛错，
+ * 由路由层返回明确提示（不静默降级，让用户知道是自己的密钥问题）。
  */
 async function generateScript(
   content: string,
   audience: string,
+  key: MoonshotKeyResolution,
 ): Promise<LessonScript> {
-  if (!env.moonshotApiKey) {
-    console.warn("[script] 未配置 MOONSHOT_API_KEY，使用模板降级");
+  if (key.kind === "none") {
+    console.warn("[script] 无可用密钥，使用模板降级");
     return fallbackScript(content, audience);
   }
   const chain: { model: string; timeout: number }[] = [
@@ -99,15 +104,54 @@ async function generateScript(
   if (env.moonshotModel !== "kimi-k3") {
     chain.push({ model: "kimi-k3", timeout: 45_000 });
   }
+  let lastError: unknown = null;
   for (const step of chain) {
     try {
-      return await callModel(step.model, content, audience, step.timeout);
+      return await callModel(key.apiKey, step.model, content, audience, step.timeout);
     } catch (e) {
-      console.error(`[script] 模型 ${step.model} 调用失败:`, e);
+      lastError = e;
+      console.error(`[script] 模型 ${step.model} 调用失败（${key.kind} 密钥）:`, e);
     }
   }
-  console.error("[script] 所有模型均失败，使用模板降级");
-  return fallbackScript(content, audience);
+  if (key.kind === "site") {
+    console.error("[script] 站点密钥所有模型均失败，使用模板降级");
+    return fallbackScript(content, audience);
+  }
+  // 用户自己的密钥失败：提取 Moonshot 状态码，给出可操作提示
+  const msg = lastError instanceof Error ? lastError.message : "";
+  if (msg.includes("401") || msg.includes("403")) {
+    throw new Error("你的 Moonshot 密钥无效或已过期，请在「密钥设置」中更新");
+  }
+  if (msg.includes("429")) {
+    throw new Error("你的 Moonshot 账户额度不足或触发限流，请充值或稍后再试");
+  }
+  throw new Error("使用你的 Moonshot 密钥生成失败，请检查密钥设置或稍后重试");
+}
+
+type AuthUserCtx = { id: number; username: string; displayName: string; role: string };
+
+/** 解析当前用户的密钥；普通用户未配置时返回 400 错误响应 */
+async function requireMoonshotKey(
+  c: Context,
+): Promise<{ key?: MoonshotKeyResolution; errorResponse?: Response }> {
+  const authUser = c.get("authUser") as AuthUserCtx | undefined;
+  if (!authUser) {
+    return { errorResponse: c.json({ error: "请先登录后再使用" }, 401) };
+  }
+  const key = await resolveMoonshotKey(authUser);
+  if (key.kind === "none") {
+    return {
+      errorResponse: c.json(
+        {
+          error:
+            "你还未配置自己的 Moonshot API 密钥。请点击右上角「密钥设置」，填入密钥后再生成（密钥免费申请，生成将消耗你自己账户的额度）",
+          code: "MOONSHOT_KEY_REQUIRED",
+        },
+        400,
+      ),
+    };
+  }
+  return { key };
 }
 
 function validateInput(body: { content?: string; audience?: string }) {
@@ -128,8 +172,15 @@ scriptRoute.post("/api/script", async (c) => {
   }
   const input = validateInput(body);
   if ("error" in input) return c.json({ error: input.error }, 400);
-  const script = await generateScript(input.content, input.audience);
-  return c.json(script);
+  const { key, errorResponse } = await requireMoonshotKey(c);
+  if (errorResponse) return errorResponse;
+  try {
+    const script = await generateScript(input.content, input.audience, key!);
+    return c.json(script);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "讲解稿生成失败，请重新生成";
+    return c.json({ error: msg }, 502);
+  }
 });
 
 // ── 异步任务模式（保留兼容：POST /api/script/job 创建，GET 轮询） ──
@@ -158,18 +209,20 @@ scriptRoute.post("/api/script/job", async (c) => {
   }
   const input = validateInput(body);
   if ("error" in input) return c.json({ error: input.error }, 400);
+  const { key, errorResponse } = await requireMoonshotKey(c);
+  if (errorResponse) return errorResponse;
   sweepJobs();
   const jobId = randomUUID();
   jobs.set(jobId, { status: "pending", createdAt: Date.now() });
   void (async () => {
     try {
-      const script = await generateScript(input.content, input.audience);
+      const script = await generateScript(input.content, input.audience, key!);
       jobs.set(jobId, { status: "done", script, createdAt: Date.now() });
     } catch (e) {
       console.error("[script] 任务执行异常:", e);
       jobs.set(jobId, {
         status: "error",
-        error: "讲解稿生成失败，请重新生成",
+        error: e instanceof Error ? e.message : "讲解稿生成失败，请重新生成",
         createdAt: Date.now(),
       });
     }
