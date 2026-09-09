@@ -19,22 +19,37 @@ export interface AssembleOutput {
   blob: Blob;
 }
 
+/** 预加载：ffmpeg core 约 30MB，在讲解稿/配音阶段后台加载完成 */
+let loadPromise: Promise<FFmpeg> | null = null;
+
+export function preloadFFmpeg(): void {
+  if (loadPromise) return;
+  loadPromise = (async () => {
+    const ffmpeg = new FFmpeg();
+    // 单线程 core，从本站 /ffmpeg/ 加载（dev 与生产路径一致）
+    const coreURL = await toBlobURL("/ffmpeg/ffmpeg-core.js", "text/javascript");
+    const wasmURL = await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm");
+    await ffmpeg.load({ coreURL, wasmURL });
+    return ffmpeg;
+  })();
+  // 预加载失败时重置，让 assembleVideo 可以重新触发加载
+  loadPromise.catch(() => {
+    loadPromise = null;
+  });
+}
+
 /**
  * 用 ffmpeg.wasm 合成 MP4。
- * 每次调用创建全新实例，结束后 terminate 释放资源。
+ * 实例在首次合成后保留（重新生成时无需重新加载 core）。
  */
 export async function assembleVideo(input: AssembleInput): Promise<AssembleOutput> {
   const { frames, audios, onProgress } = input;
   if (frames.length === 0) throw new Error("没有可用的视频帧");
   if (audios.length === 0) throw new Error("没有可用的配音音频");
 
-  const ffmpeg = new FFmpeg();
+  preloadFFmpeg();
+  const ffmpeg = await loadPromise!;
   try {
-    // 单线程 core，从本站 /ffmpeg/ 加载（dev 与生产路径一致）
-    const coreURL = await toBlobURL("/ffmpeg/ffmpeg-core.js", "text/javascript");
-    const wasmURL = await toBlobURL("/ffmpeg/ffmpeg-core.wasm", "application/wasm");
-    await ffmpeg.load({ coreURL, wasmURL });
-
     if (onProgress) {
       ffmpeg.on("progress", ({ progress }) => {
         const ratio = Number.isFinite(progress) ? Math.min(1, Math.max(0, progress)) : 0;
@@ -89,12 +104,12 @@ export async function assembleVideo(input: AssembleInput): Promise<AssembleOutpu
     frameLines.push(`file 'frame_${String(frames.length - 1).padStart(3, "0")}.png'`);
     await ffmpeg.writeFile("frames.txt", new TextEncoder().encode(frameLines.join("\n")));
 
-    // 合成 MP4
+    // 合成 MP4（静态幻灯片内容，fps=12 视觉无差别，编码时间减半）
     const code = await ffmpeg.exec([
       "-f", "concat", "-safe", "0",
       "-i", "frames.txt",
       "-i", "all.mp3",
-      "-vf", "fps=24,format=yuv420p",
+      "-vf", "fps=12,format=yuv420p",
       "-c:v", "libx264",
       "-preset", "ultrafast",
       "-crf", "24",
@@ -111,11 +126,14 @@ export async function assembleVideo(input: AssembleInput): Promise<AssembleOutpu
     const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "video/mp4" });
     const blobUrl = URL.createObjectURL(blob);
     return { blobUrl, blob };
-  } finally {
+  } catch (e) {
+    // 出错时释放实例，下次合成重新加载
     try {
       ffmpeg.terminate();
     } catch {
       // 实例可能已释放
     }
+    loadPromise = null;
+    throw e;
   }
 }
