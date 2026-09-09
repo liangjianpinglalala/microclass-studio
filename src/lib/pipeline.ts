@@ -8,7 +8,7 @@ import {
   type LessonScript,
 } from "./lesson";
 import { renderCaptionFrame, renderSlide, type SlideImage } from "./slides";
-import { assembleVideo } from "./video";
+import { assembleVideo, preloadFFmpeg } from "./video";
 
 export type StageStatus = "pending" | "active" | "done" | "error";
 
@@ -182,6 +182,7 @@ export async function runPipeline(
   const progress = (p: number) => cb.onProgress?.(Math.min(100, Math.max(0, p)));
 
   try {
+    preloadFFmpeg(); // 后台预加载视频引擎（约30MB），与讲解稿/配音并行
     /* ① 生成讲解稿 0→15% */
     stage(0, "active");
     progress(2);
@@ -201,7 +202,7 @@ export async function runPipeline(
     log(1, "开始合成四段中文配音…");
     const narrations = script.sections.map((s) => s.narration);
     let ttsDone = 0;
-    const audioBlobs = await mapWithConcurrency(narrations, 2, async (text, i) => {
+    const audioBlobs = await mapWithConcurrency(narrations, 4, async (text, i) => {
       try {
         const blob = await fetchTTS(text, voiceId);
         ttsDone++;
