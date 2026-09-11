@@ -56,7 +56,6 @@ export default function FormSection(props: FormSectionProps) {
 
   const [typing, setTyping] = useState(false);
   const [tab, setTab] = useState<"paste" | "upload">("paste");
-  const [uploadConfirming, setUploadConfirming] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -272,7 +271,7 @@ export default function FormSection(props: FormSectionProps) {
               </div>
               <UploadPanel
                 disabled={disabled}
-                onViewChange={(v) => setUploadConfirming(v === "confirm")}
+                onViewChange={() => {}}
                 onSwitchToPaste={() => setTab("paste")}
                 onConfirm={(text) => {
                   onContentChange(text);
@@ -282,9 +281,7 @@ export default function FormSection(props: FormSectionProps) {
             </div>
           )}
 
-          {/* 学习对象与音色（确认内容时收起） */}
-          {!(tab === "upload" && uploadConfirming) && (
-            <>
+          {/* 学习对象与音色（上传确认内容时同样保留，便于先选好再生成） */}
           {/* 学习对象 */}
           <div>
             <div className="mb-2 flex items-end justify-between">
@@ -377,8 +374,6 @@ export default function FormSection(props: FormSectionProps) {
                 })}
               </div>
             </div>
-          )}
-            </>
           )}
 
           {/* 生成按钮（粘贴文字流程） */}
